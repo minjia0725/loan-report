@@ -23,7 +23,10 @@ const defaultParams = {
     years2: 40,
     gracePeriod2: 0,
     
-    annualSalary: 300,
+    // 收入設定 (拆分為男女方)
+    incomeHusband: 150,
+    incomeWife: 150,
+    annualSalary: undefined, // 棄用，保留供遷移邏輯判斷
     salaryGrowth: 7,
     rentIncome: 0,
     
@@ -51,6 +54,17 @@ const migrateRates = (p, key, rateKey, yearsKey) => {
 };
 migrateRates(params.value, 'rates1', 'interestRate1', 'years1');
 migrateRates(params.value, 'rates2', 'interestRate2', 'years2');
+
+// 資料遷移：收入欄位 (將舊 annualSalary 轉移到 incomeHusband)
+if (params.value.annualSalary !== undefined && params.value.annualSalary !== null) {
+    // 只有在新欄位都還沒有值的時候才覆蓋，避免使用者輸入後被舊資料蓋掉
+    if (!params.value.incomeHusband && !params.value.incomeWife) {
+        params.value.incomeHusband = params.value.annualSalary;
+        params.value.incomeWife = 0;
+    }
+    // 清除舊欄位
+    params.value.annualSalary = undefined;
+}
 
 // 輔助函數：新增利率區段
 const addRateStage = (rates, totalYears) => {
@@ -274,11 +288,18 @@ useCharts(params, monthlyPaymentTotal, simulationData);
                     <!-- 收入設定 -->
                     <div class="mb-6">
                         <h3 class="subsection-title">家庭收入</h3>
-                        <div class="input-group">
-                            <label class="input-label">家庭年薪資 (萬元) <span class="text-red-500">*</span></label>
-                            <input type="number" v-model.number="params.annualSalary" class="input-field" :class="{'border-red-500': errors.annualSalary}" min="0">
-                            <p v-if="errors.annualSalary" class="error-text">{{ errors.annualSalary }}</p>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div class="input-group">
+                                <label class="input-label">男方年薪 (萬元)</label>
+                                <input type="number" v-model.number="params.incomeHusband" class="input-field" :class="{'border-red-500': errors.incomeHusband}" min="0">
+                            </div>
+                            <div class="input-group">
+                                <label class="input-label">女方年薪 (萬元)</label>
+                                <input type="number" v-model.number="params.incomeWife" class="input-field" :class="{'border-red-500': errors.incomeWife}" min="0">
+                            </div>
                         </div>
+                        <p v-if="errors.incomeHusband || errors.incomeWife" class="error-text mb-3">{{ errors.incomeHusband || errors.incomeWife }}</p>
+                        
                         <div class="input-group">
                             <label class="input-label">薪資成長率 (%) - 前5年</label>
                             <input type="number" v-model.number="params.salaryGrowth" class="input-field" min="0" step="0.1" :class="{'border-red-500': errors.salaryGrowth}">

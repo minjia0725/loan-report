@@ -60,7 +60,14 @@ export function useValidation(params) {
         if (p.gracePeriod2 >= p.years2) newErrors.gracePeriod2 = "寬限期必須小於貸款年限";
 
         // 收入驗證
-        if (!p.annualSalary || p.annualSalary <= 0) newErrors.annualSalary = "請輸入有效的家庭年薪";
+        const totalIncome = (p.incomeHusband || 0) + (p.incomeWife || 0);
+        if (totalIncome <= 0) {
+            newErrors.incomeHusband = "請至少輸入其中一方薪資";
+            newErrors.incomeWife = "請至少輸入其中一方薪資";
+        }
+        if (p.incomeHusband < 0) newErrors.incomeHusband = "薪資不能為負數";
+        if (p.incomeWife < 0) newErrors.incomeWife = "薪資不能為負數";
+        
         if (p.salaryGrowth < 0) newErrors.salaryGrowth = "成長率不能為負";
         if (p.rentIncome < 0) newErrors.rentIncome = "租金不能為負";
         

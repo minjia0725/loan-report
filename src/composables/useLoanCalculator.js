@@ -135,8 +135,11 @@ export function useLoanCalculator(params) {
         loan1Schedule.value.currentPayment + loan2Schedule.value.currentPayment
     );
 
+    // 計算屬性：總家庭年薪
+    const totalAnnualSalary = computed(() => (params.value.incomeHusband || 0) + (params.value.incomeWife || 0));
+
     // 計算屬性：負擔比
-    const monthlySalary = computed(() => params.value.annualSalary / 12);
+    const monthlySalary = computed(() => totalAnnualSalary.value / 12);
     
     // 負擔比這裡改用「最高月付金」來計算壓力，避免只看寬限期覺得很輕鬆
     const maxMonthlyPayment = computed(() => {
@@ -184,7 +187,7 @@ export function useLoanCalculator(params) {
     // 模擬未來 10 年現金流
     const simulationData = computed(() => {
         const data = [];
-        let currentSalary = params.value.annualSalary;
+        let currentSalary = totalAnnualSalary.value;
         let accumulated = 0;
         
         const e = params.value.expense;
