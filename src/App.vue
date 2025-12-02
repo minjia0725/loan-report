@@ -97,7 +97,7 @@ const removeRateStage = (rates, index) => {
         // 修正連續性邏輯比較複雜，這裡先做基礎刪除，靠 validate 提示
         // 更好的做法是刪除該段後，上一段自動吃掉該段的區間
         if (index > 0) {
-             rates[index-1].yearEnd = (rates[index] ? rates[index].yearStart - 1 : 40);
+            rates[index-1].yearEnd = (rates[index] ? rates[index].yearStart - 1 : 40);
         }
     }
 };
@@ -137,7 +137,7 @@ const updateRateStages = (rates, index, totalYears) => {
 
 
 // 引入核心邏輯 Hook
-const { errors, validate } = useValidation(params);
+const { errors } = useValidation(params);
 
 const {
     formatMoney,
@@ -173,9 +173,7 @@ const totalAnnualExpense = computed(() => {
         <!-- 標題區 -->
         <div class="mb-8 text-center">
             <h1 class="text-3xl font-bold text-gray-800 mb-2">
-                <span v-if="params.housePrice">{{ params.housePrice.toLocaleString() }}</span>
-                <span v-else>...</span>
-                萬購屋決策財務評估
+                購屋決策財務評估
             </h1>
             
             <!-- 全局錯誤提示 -->
