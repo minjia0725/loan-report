@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import { useValidation } from './composables/useValidation';
 import { useLoanCalculator } from './composables/useLoanCalculator';
 import { useCharts } from './composables/useCharts';
@@ -157,6 +157,14 @@ const {
 
 // 初始化圖表
 useCharts(params, monthlyPaymentTotal, simulationData);
+
+// 計算年度總支出 (用於圖表標題顯示)
+const totalAnnualExpense = computed(() => {
+    const e = params.value.expense;
+    const annualMortgage = monthlyPaymentTotal.value * 12;
+    const annualLiving = e.basic_food + e.basic_house + e.parents + e.shopping + e.travel + e.insurance + e.car;
+    return annualMortgage + annualLiving;
+});
 
 </script>
 
@@ -547,7 +555,12 @@ useCharts(params, monthlyPaymentTotal, simulationData);
                 <!-- 圖表區 -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <div class="card h-80">
-                        <h3 class="text-lg font-bold mb-4">💸 年度支出結構分析</h3>
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-bold">💸 年度支出結構分析</h3>
+                            <span class="text-sm font-bold text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                                總計: {{ formatMoney(totalAnnualExpense) }} 萬
+                            </span>
+                        </div>
                         <div class="h-64 relative">
                             <canvas id="expenseChart"></canvas>
                         </div>
