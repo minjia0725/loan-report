@@ -4,8 +4,11 @@ export function useLoanCalculator(params) {
     
     // 輔助格式化函數
     const formatMoney = (val) => {
-        if (val === undefined || val === null || isNaN(val)) return '0.0';
-        return val.toFixed(1);
+        // 嘗試轉為數字
+        const num = Number(val);
+        // 檢查是否為有效數字
+        if (val === undefined || val === null || val === '' || isNaN(num)) return '0.0';
+        return num.toFixed(1);
     };
 
     // 本息平均攤還法 - 計算月付金 (給定本金、年利率、總期數)
@@ -254,7 +257,8 @@ export function useLoanCalculator(params) {
             const annualMortgage = ((s1?.monthlyPayment || 0) + (s2?.monthlyPayment || 0)) * 12;
             const isGracePeriod = (s1?.isGracePeriod || false) || (s2?.isGracePeriod || false);
 
-            const totalIncome = actualHusbandSalary + actualWifeSalary + params.value.rentIncome;
+            const rentIncome = params.value.rentIncome || 0; // 防呆：確保為數字
+            const totalIncome = actualHusbandSalary + actualWifeSalary + rentIncome;
             const totalExpense = annualMortgage + currentLiving + extraExpense;
             const balance = totalIncome - totalExpense;
             accumulated += balance;
