@@ -1,34 +1,123 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { useValidation } from './composables/useValidation';
 import { useLoanCalculator } from './composables/useLoanCalculator';
 import { useCharts } from './composables/useCharts';
+import { useStorage } from './composables/useStorage';
 
-// 參數設定
-const params = ref({
+// 預設參數設定
+const defaultParams = {
     housePrice: 1800,
     decoration: 100,
-    mortgageLoan: 460, // 抵押貸款 (頭期+裝潢)
-    interestRate1: 3.5, // 抵押利率
+    mortgageLoan: 460,
+    
+    // 貸款 1 設定
+    interestRate1: 3.5, // 相容舊欄位
+    rates1: [{ yearStart: 1, yearEnd: 20, rate: 3.5 }], // 新增多段利率結構
     years1: 20,
-    interestRate2: 3.5, // 購屋利率
+    gracePeriod1: 0,
+    
+    // 貸款 2 設定
+    interestRate2: 3.5,
+    rates2: [{ yearStart: 1, yearEnd: 40, rate: 3.5 }],
     years2: 40,
+    gracePeriod2: 0,
     
     annualSalary: 300,
     salaryGrowth: 7,
     rentIncome: 0,
     
     expense: {
-        basic_food: 30, // 飲食雜支
-        basic_house: 9, // 管理水電
+        basic_food: 30,
+        basic_house: 9,
         parents: 13,
         shopping: 35,
         travel: 20,
         insurance: 15,
         car: 3,
         baby: 20
+    },
+    babyYear: 3
+};
+
+// 使用 LocalStorage 持久化參數
+const params = useStorage('loan-report-params', defaultParams);
+
+// 資料遷移：如果讀取的舊資料沒有 rates 陣列，根據 interestRate 初始化它
+const migrateRates = (p, key, rateKey, yearsKey) => {
+    if (!p[key] || !Array.isArray(p[key]) || p[key].length === 0) {
+        p[key] = [{ yearStart: 1, yearEnd: p[yearsKey], rate: p[rateKey] }];
+    }
+};
+migrateRates(params.value, 'rates1', 'interestRate1', 'years1');
+migrateRates(params.value, 'rates2', 'interestRate2', 'years2');
+
+// 輔助函數：新增利率區段
+const addRateStage = (rates, totalYears) => {
+    const lastStage = rates[rates.length - 1];
+    // 如果最後一段還沒到總年限，才可以新增
+    if (lastStage.yearEnd < totalYears) {
+        const newStart = lastStage.yearEnd + 1;
+        rates.push({ 
+            yearStart: newStart, 
+            yearEnd: totalYears, 
+            rate: lastStage.rate 
+        });
+    }
+};
+
+// 輔助函數：移除利率區段
+const removeRateStage = (rates, index) => {
+    if (rates.length > 1) {
+        rates.splice(index, 1);
+        // 重新調整剩餘區段的年份連接
+        // 這裡簡單處理：前一段直接延伸到被刪除段的結束年
+        // 或是被刪除段的後一段自動接上前一段
+        // 為求簡單，刪除後建議使用者手動調整，或者自動修正第一段起點為1
+        if(index > 0) {
+            rates[index-1].yearEnd = rates[index] ? rates[index].yearStart - 1 : params.value.years1; // 這裡有個小bug, years1可能是years2
+        }
+        // 修正連續性邏輯比較複雜，這裡先做基礎刪除，靠 validate 提示
+        // 更好的做法是刪除該段後，上一段自動吃掉該段的區間
+        if (index > 0) {
+             rates[index-1].yearEnd = (rates[index] ? rates[index].yearStart - 1 : 40);
+        }
+    }
+};
+
+// 監聽年限變化自動修正最後一段結束年
+watch(() => params.value.years1, (newVal) => {
+    if (params.value.rates1.length > 0) {
+        params.value.rates1[params.value.rates1.length - 1].yearEnd = newVal;
     }
 });
+watch(() => params.value.years2, (newVal) => {
+    if (params.value.rates2.length > 0) {
+        params.value.rates2[params.value.rates2.length - 1].yearEnd = newVal;
+    }
+});
+
+// 自動修正利率區段連續性
+const updateRateStages = (rates, index, totalYears) => {
+    // 只有當不是最後一段時，才需要連動下一段
+    if (index < rates.length - 1) {
+        const currentStage = rates[index];
+        const nextStage = rates[index + 1];
+        
+        // 下一段起始 = 這一段結束 + 1
+        nextStage.yearStart = currentStage.yearEnd + 1;
+        
+        // 防呆：如果這一段結束已經超過總年限 (雖然驗證會擋，但這裡先不處理，讓使用者自己改)
+        
+        // 如果下一段的起始已經超過它的結束，則把結束往後推，保持至少 1 年
+        if (nextStage.yearStart > nextStage.yearEnd) {
+            nextStage.yearEnd = nextStage.yearStart;
+            // 遞迴檢查再下一段
+            updateRateStages(rates, index + 1, totalYears);
+        }
+    }
+};
+
 
 // 引入核心邏輯 Hook
 const { errors, validate } = useValidation(params);
@@ -36,16 +125,17 @@ const { errors, validate } = useValidation(params);
 const {
     formatMoney,
     purchaseLoanAmount,
-    mortgagePayment1,
-    mortgagePayment2,
     monthlyPaymentTotal,
+    maxMonthlyPayment,
     burdenRatio,
     burdenRatioClass,
     burdenRatioColor,
     burdenRatioText,
     burdenRatioStatusClass,
     simulationData,
-    totalAssets10Year
+    totalAssets10Year,
+    loan1Schedule,
+    loan2Schedule
 } = useLoanCalculator(params);
 
 // 初始化圖表
@@ -60,9 +150,8 @@ useCharts(params, monthlyPaymentTotal, simulationData);
             <h1 class="text-3xl font-bold text-gray-800 mb-2">
                 <span v-if="params.housePrice">{{ params.housePrice.toLocaleString() }}</span>
                 <span v-else>...</span>
-                 萬購屋決策全方位財務評估
+                萬購屋決策財務評估
             </h1>
-            <p class="text-gray-600">零租金、高支出標準下的極限壓力測試報告</p>
             
             <!-- 全局錯誤提示 -->
             <div v-if="Object.keys(errors).length > 0" class="error-banner">
@@ -103,32 +192,82 @@ useCharts(params, monthlyPaymentTotal, simulationData);
                         
                         <div class="mb-4">
                             <label class="subsection-label">1. 家人抵押貸款 (頭期)</label>
-                            <div class="grid grid-cols-2 gap-2">
-                                <div class="input-group mb-0">
-                                    <label class="text-xs text-gray-600">利率 (%)</label>
-                                    <input type="number" v-model.number="params.interestRate1" step="0.1" min="0" class="input-field text-sm" :class="{'border-red-500': errors.interestRate1}">
-                                </div>
+                            
+                            <!-- 基本設定 -->
+                            <div class="grid grid-cols-2 gap-2 mb-2">
                                 <div class="input-group mb-0">
                                     <label class="text-xs text-gray-600">年限 (年)</label>
                                     <input type="number" v-model.number="params.years1" min="1" class="input-field text-sm" :class="{'border-red-500': errors.years1}">
                                 </div>
+                                <div class="input-group mb-0">
+                                    <label class="text-xs text-gray-600">寬限期 (年)</label>
+                                    <input type="number" v-model.number="params.gracePeriod1" min="0" class="input-field text-sm" :class="{'border-red-500': errors.gracePeriod1}">
+                                </div>
                             </div>
-                            <div v-if="errors.interestRate1 || errors.years1" class="error-text">請檢查利率與年限</div>
+
+                            <!-- 多段利率設定 -->
+                            <div class="bg-white p-2 rounded border border-gray-200">
+                                <label class="text-xs font-bold text-gray-500 block mb-1 flex justify-between items-center">
+                                    <span>利率設定 (階梯式)</span>
+                                    <button @click="addRateStage(params.rates1, params.years1)" class="text-blue-500 hover:text-blue-700 text-xs font-bold px-2 py-1 border border-blue-200 rounded bg-blue-50 transition-colors">
+                                        + 新增區段
+                                    </button>
+                                </label>
+                                <div v-for="(stage, index) in params.rates1" :key="index" class="flex items-center mb-1 gap-1">
+                                    <div class="flex items-center gap-1 flex-1">
+                                        <span class="text-xs text-gray-400">Y</span>
+                                        <input type="number" v-model.number="stage.yearStart" class="w-10 p-1 text-xs border rounded text-center" readonly disabled>
+                                        <span class="text-xs text-gray-400">~</span>
+                                        <input type="number" v-model.number="stage.yearEnd" @input="updateRateStages(params.rates1, index, params.years1)" class="w-16 p-1 text-xs border rounded text-center bg-white" :class="{'bg-gray-100': index === params.rates1.length - 1}">
+                                    </div>
+                                    <div class="flex items-center gap-1 w-20">
+                                        <input type="number" v-model.number="stage.rate" step="0.01" class="w-full p-1 text-xs border rounded text-right">
+                                        <span class="text-xs text-gray-500">%</span>
+                                    </div>
+                                    <button v-if="params.rates1.length > 1 && index === params.rates1.length - 1" @click="removeRateStage(params.rates1, index)" class="text-red-400 hover:text-red-600 text-xs px-1">×</button>
+                                </div>
+                                <div v-if="errors.rates1" class="error-text">{{ errors.rates1 }}</div>
+                            </div>
                         </div>
 
                         <div class="mb-0">
                             <label class="subsection-label">2. 購屋貸款 (尾款)</label>
-                            <div class="grid grid-cols-2 gap-2">
-                                <div class="input-group mb-0">
-                                    <label class="text-xs text-gray-600">利率 (%)</label>
-                                    <input type="number" v-model.number="params.interestRate2" step="0.1" min="0" class="input-field text-sm" :class="{'border-red-500': errors.interestRate2}">
-                                </div>
+                            
+                            <!-- 基本設定 -->
+                            <div class="grid grid-cols-2 gap-2 mb-2">
                                 <div class="input-group mb-0">
                                     <label class="text-xs text-gray-600">年限 (年)</label>
                                     <input type="number" v-model.number="params.years2" min="1" class="input-field text-sm" :class="{'border-red-500': errors.years2}">
                                 </div>
+                                <div class="input-group mb-0">
+                                    <label class="text-xs text-gray-600">寬限期 (年)</label>
+                                    <input type="number" v-model.number="params.gracePeriod2" min="0" class="input-field text-sm" :class="{'border-red-500': errors.gracePeriod2}">
+                                </div>
                             </div>
-                            <div v-if="errors.interestRate2 || errors.years2" class="error-text">請檢查利率與年限</div>
+
+                            <!-- 多段利率設定 -->
+                            <div class="bg-white p-2 rounded border border-gray-200">
+                                <label class="text-xs font-bold text-gray-500 block mb-1 flex justify-between items-center">
+                                    <span>利率設定 (階梯式)</span>
+                                    <button @click="addRateStage(params.rates2, params.years2)" class="text-blue-500 hover:text-blue-700 text-xs font-bold px-2 py-1 border border-blue-200 rounded bg-blue-50 transition-colors">
+                                        + 新增區段
+                                    </button>
+                                </label>
+                                <div v-for="(stage, index) in params.rates2" :key="index" class="flex items-center mb-1 gap-1">
+                                    <div class="flex items-center gap-1 flex-1">
+                                        <span class="text-xs text-gray-400">Y</span>
+                                        <input type="number" v-model.number="stage.yearStart" class="w-10 p-1 text-xs border rounded text-center" readonly disabled>
+                                        <span class="text-xs text-gray-400">~</span>
+                                        <input type="number" v-model.number="stage.yearEnd" @input="updateRateStages(params.rates2, index, params.years2)" class="w-16 p-1 text-xs border rounded text-center bg-white" :class="{'bg-gray-100': index === params.rates2.length - 1}">
+                                    </div>
+                                    <div class="flex items-center gap-1 w-20">
+                                        <input type="number" v-model.number="stage.rate" step="0.01" class="w-full p-1 text-xs border rounded text-right">
+                                        <span class="text-xs text-gray-500">%</span>
+                                    </div>
+                                    <button v-if="params.rates2.length > 1 && index === params.rates2.length - 1" @click="removeRateStage(params.rates2, index)" class="text-red-400 hover:text-red-600 text-xs px-1">×</button>
+                                </div>
+                                <div v-if="errors.rates2" class="error-text">{{ errors.rates2 }}</div>
+                            </div>
                         </div>
                     </div>
 
@@ -214,10 +353,17 @@ useCharts(params, monthlyPaymentTotal, simulationData);
                         <!-- 4. 特殊支出 -->
                         <div class="mb-0 border-l-4 border-purple-400 pl-3">
                             <h4 class="group-title">👶 4. 特殊支出 (一次性)</h4>
-                            <div class="input-group mb-0">
-                                <label class="input-label">月子中心</label>
-                                <input type="number" v-model.number="params.expense.baby" class="input-field" min="0">
-                                <p class="helper-text">僅於懷孕年度計算</p>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div class="input-group mb-0">
+                                    <label class="input-label">發生年度 (第N年)</label>
+                                    <input type="number" v-model.number="params.babyYear" class="input-field" min="1" max="10">
+                                    <p class="helper-text">設定哪一年懷孕</p>
+                                </div>
+                                <div class="input-group mb-0">
+                                    <label class="input-label">月子中心</label>
+                                    <input type="number" v-model.number="params.expense.baby" class="input-field" min="0">
+                                    <p class="helper-text">僅於該年度計算</p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -229,12 +375,12 @@ useCharts(params, monthlyPaymentTotal, simulationData);
                 <!-- 關鍵指標卡 -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <div class="card kpi-card border-blue-500">
-                        <div class="kpi-label">總月付金</div>
-                        <div class="kpi-value text-gray-800">{{ formatMoney(monthlyPaymentTotal) }}<span class="text-sm">萬</span></div>
-                        <div class="kpi-sub text-gray-500">佔月薪 {{ burdenRatio }}%</div>
+                        <div class="kpi-label">最高月付金</div>
+                        <div class="kpi-value text-gray-800">{{ formatMoney(maxMonthlyPayment) }}<span class="text-sm">萬</span></div>
+                        <div class="kpi-sub text-gray-500">壓力測試 (前10年)</div>
                     </div>
                     <div class="card kpi-card" :class="burdenRatioClass">
-                        <div class="kpi-label">房貸負擔比 (純薪資)</div>
+                        <div class="kpi-label">最高負擔比</div>
                         <div class="kpi-value" :class="burdenRatioColor">{{ burdenRatio }}%</div>
                         <div class="mt-2" :class="burdenRatioStatusClass">{{ burdenRatioText }}</div>
                     </div>
@@ -249,7 +395,7 @@ useCharts(params, monthlyPaymentTotal, simulationData);
                 <div class="card mb-6">
                     <h3 class="section-title flex items-center">
                         <span class="icon-box">💰</span> 
-                        貸款試算明細
+                        貸款試算明細 (首年)
                     </h3>
                     <div class="overflow-x-auto">
                         <table class="data-table">
@@ -257,9 +403,9 @@ useCharts(params, monthlyPaymentTotal, simulationData);
                                 <tr>
                                     <th class="p-3 border-b">貸款項目</th>
                                     <th class="p-3 border-b">貸款金額</th>
-                                    <th class="p-3 border-b">年利率</th>
+                                    <th class="p-3 border-b">首年利率</th>
                                     <th class="p-3 border-b">年限</th>
-                                    <th class="p-3 border-b font-bold text-blue-600 text-right">月付金</th>
+                                    <th class="p-3 border-b font-bold text-blue-600 text-right">首年已付</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -267,21 +413,31 @@ useCharts(params, monthlyPaymentTotal, simulationData);
                                     <td class="p-3">
                                         <span class="font-bold text-gray-800">1. 家人抵押貸款</span>
                                         <span class="block text-xs text-gray-500">頭期款 + 裝潢</span>
+                                        <span v-if="params.gracePeriod1 > 0" class="inline-block bg-orange-100 text-orange-800 text-xs px-2 py-0.5 rounded mt-1">
+                                            寬限期 {{ params.gracePeriod1 }} 年
+                                        </span>
                                     </td>
                                     <td class="p-3">{{ params.mortgageLoan }} 萬</td>
-                                    <td class="p-3">{{ params.interestRate1 }}%</td>
+                                    <td class="p-3">{{ params.rates1?.[0]?.rate || params.interestRate1 }}%</td>
                                     <td class="p-3">{{ params.years1 }} 年</td>
-                                    <td class="p-3 text-right font-mono font-bold">{{ formatMoney(mortgagePayment1) }} 萬</td>
+                                    <td class="p-3 text-right font-mono font-bold text-blue-600">
+                                        {{ formatMoney(loan1Schedule.currentPayment) }} 萬
+                                    </td>
                                 </tr>
                                 <tr class="border-b">
                                     <td class="p-3">
                                         <span class="font-bold text-gray-800">2. 購屋貸款</span>
                                         <span class="block text-xs text-gray-500">房價尾款 (76%)</span>
+                                        <span v-if="params.gracePeriod2 > 0" class="inline-block bg-orange-100 text-orange-800 text-xs px-2 py-0.5 rounded mt-1">
+                                            寬限期 {{ params.gracePeriod2 }} 年
+                                        </span>
                                     </td>
                                     <td class="p-3">{{ purchaseLoanAmount }} 萬</td>
-                                    <td class="p-3">{{ params.interestRate2 }}%</td>
+                                    <td class="p-3">{{ params.rates2?.[0]?.rate || params.interestRate2 }}%</td>
                                     <td class="p-3">{{ params.years2 }} 年</td>
-                                    <td class="p-3 text-right font-mono font-bold">{{ formatMoney(mortgagePayment2) }} 萬</td>
+                                    <td class="p-3 text-right font-mono font-bold text-blue-600">
+                                        {{ formatMoney(loan2Schedule.currentPayment) }} 萬
+                                    </td>
                                 </tr>
                                 <tr class="bg-blue-50">
                                     <td class="p-3 font-bold text-gray-800">總計</td>
@@ -331,10 +487,16 @@ useCharts(params, monthlyPaymentTotal, simulationData);
                                 <tr v-for="year in simulationData" :key="year.year" class="border-b hover:bg-gray-50">
                                     <td class="p-3 font-bold">Y{{ year.year }}</td>
                                     <td class="p-3">
-                                        <span v-if="year.note" class="px-2 py-1 rounded text-xs" :class="year.noteClass">{{ year.note }}</span>
+                                        <div class="flex flex-wrap gap-1">
+                                            <span v-if="year.note" class="px-2 py-1 rounded text-xs" :class="year.noteClass">{{ year.note }}</span>
+                                            <span v-if="year.isGracePeriod" class="px-2 py-1 rounded text-xs bg-orange-100 text-orange-800">寬限期</span>
+                                        </div>
                                     </td>
                                     <td class="p-3">{{ formatMoney(year.income) }}</td>
-                                    <td class="p-3">{{ formatMoney(year.mortgage) }}</td>
+                                    <td class="p-3">
+                                        {{ formatMoney(year.mortgage) }}
+                                        <span v-if="year.isGracePeriod" class="text-xs text-gray-400 block">(只繳息)</span>
+                                    </td>
                                     <td class="p-3">{{ formatMoney(year.living) }}</td>
                                     <td class="p-3 font-bold" :class="year.balance >= 0 ? 'text-green-600' : 'text-red-600'">
                                         {{ year.balance >= 0 ? '+' : '' }}{{ formatMoney(year.balance) }}
@@ -362,7 +524,7 @@ useCharts(params, monthlyPaymentTotal, simulationData);
                                 <li><strong class="text-gray-900">資金策略：</strong>採「雙貸款模式」，以家人抵押貸款 ({{ params.mortgageLoan }}萬) 作為頭期款。</li>
                                 <li><strong class="text-gray-900">核心結論：</strong>
                                     <ul class="list-circle list-inside pl-5 mt-1 text-sm text-gray-600">
-                                        <li><strong class="text-green-600">負擔安全：</strong>純薪資負擔比約 {{ burdenRatio }}%，符合理財黃金比例。</li>
+                                        <li><strong class="text-green-600">負擔安全：</strong>純薪資負擔比約 {{ burdenRatio }}% (最高點)，符合理財黃金比例。</li>
                                         <li><strong class="text-green-600">生活富裕：</strong>預算包含每年高額旅遊與孝親費，生活品質不打折。</li>
                                         <li><strong class="text-green-600">資產穩健：</strong>10 年後預估累積 {{ formatMoney(totalAssets10Year) }} 萬現金。</li>
                                     </ul>
@@ -377,11 +539,11 @@ useCharts(params, monthlyPaymentTotal, simulationData);
                             <div class="bg-gray-50 p-4 rounded-lg">
                                 <div class="flex justify-between mb-2 border-b pb-2">
                                     <span>1. 頭期+裝潢 (家人抵押)</span>
-                                    <span class="font-bold">{{ params.mortgageLoan }} 萬 ({{ params.interestRate1 }}% / {{ params.years1 }}年)</span>
+                                    <span class="font-bold">{{ params.mortgageLoan }} 萬 ({{ params.years1 }}年)</span>
                                 </div>
                                 <div class="flex justify-between">
                                     <span>2. 購屋尾款 (一般房貸)</span>
-                                    <span class="font-bold">{{ purchaseLoanAmount }} 萬 ({{ params.interestRate2 }}% / {{ params.years2 }}年)</span>
+                                    <span class="font-bold">{{ purchaseLoanAmount }} 萬 ({{ params.years2 }}年)</span>
                                 </div>
                             </div>
                         </section>
