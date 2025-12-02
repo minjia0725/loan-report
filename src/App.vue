@@ -318,7 +318,6 @@ const totalAnnualExpense = computed(() => {
                         <div class="input-group">
                             <label class="input-label">舊屋年租金 (萬元)</label>
                             <input type="number" v-model.number="params.rentIncome" class="input-field" :class="{'border-red-500': errors.rentIncome}" min="0">
-                            <p class="helper-text">目前設定為 0</p>
                         </div>
                     </div>
 
