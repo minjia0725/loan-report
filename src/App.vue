@@ -395,7 +395,7 @@ useCharts(params, monthlyPaymentTotal, simulationData);
                 <div class="card mb-6">
                     <h3 class="section-title flex items-center">
                         <span class="icon-box">💰</span> 
-                        貸款試算明細 (首年)
+                        貸款試算明細
                     </h3>
                     <div class="overflow-x-auto">
                         <table class="data-table">
@@ -405,7 +405,9 @@ useCharts(params, monthlyPaymentTotal, simulationData);
                                     <th class="p-3 border-b">貸款金額</th>
                                     <th class="p-3 border-b">首年利率</th>
                                     <th class="p-3 border-b">年限</th>
-                                    <th class="p-3 border-b font-bold text-blue-600 text-right">首年已付</th>
+                                    <th class="p-3 border-b text-right">首年月付</th>
+                                    <th class="p-3 border-b text-right bg-gray-50">第 4 年月付</th>
+                                    <th class="p-3 border-b text-right">第 7 年月付</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -422,6 +424,21 @@ useCharts(params, monthlyPaymentTotal, simulationData);
                                     <td class="p-3">{{ params.years1 }} 年</td>
                                     <td class="p-3 text-right font-mono font-bold text-blue-600">
                                         {{ formatMoney(loan1Schedule.currentPayment) }} 萬
+                                        <span v-if="loan1Schedule.schedule[0]?.isGracePeriod" class="text-[10px] text-gray-400 block">(息)</span>
+                                    </td>
+                                    <td class="p-3 text-right font-mono bg-gray-50">
+                                        <span v-if="loan1Schedule.schedule[3]">
+                                            {{ formatMoney(loan1Schedule.schedule[3].monthlyPayment) }} 萬
+                                            <span v-if="loan1Schedule.schedule[3].isGracePeriod" class="text-[10px] text-gray-400 block">(息)</span>
+                                        </span>
+                                        <span v-else class="text-gray-300">-</span>
+                                    </td>
+                                    <td class="p-3 text-right font-mono">
+                                        <span v-if="loan1Schedule.schedule[6]">
+                                            {{ formatMoney(loan1Schedule.schedule[6].monthlyPayment) }} 萬
+                                            <span v-if="loan1Schedule.schedule[6].isGracePeriod" class="text-[10px] text-gray-400 block">(息)</span>
+                                        </span>
+                                        <span v-else class="text-gray-300">-</span>
                                     </td>
                                 </tr>
                                 <tr class="border-b">
@@ -437,6 +454,21 @@ useCharts(params, monthlyPaymentTotal, simulationData);
                                     <td class="p-3">{{ params.years2 }} 年</td>
                                     <td class="p-3 text-right font-mono font-bold text-blue-600">
                                         {{ formatMoney(loan2Schedule.currentPayment) }} 萬
+                                        <span v-if="loan2Schedule.schedule[0]?.isGracePeriod" class="text-[10px] text-gray-400 block">(息)</span>
+                                    </td>
+                                    <td class="p-3 text-right font-mono bg-gray-50">
+                                        <span v-if="loan2Schedule.schedule[3]">
+                                            {{ formatMoney(loan2Schedule.schedule[3].monthlyPayment) }} 萬
+                                            <span v-if="loan2Schedule.schedule[3].isGracePeriod" class="text-[10px] text-gray-400 block">(息)</span>
+                                        </span>
+                                        <span v-else class="text-gray-300">-</span>
+                                    </td>
+                                    <td class="p-3 text-right font-mono">
+                                        <span v-if="loan2Schedule.schedule[6]">
+                                            {{ formatMoney(loan2Schedule.schedule[6].monthlyPayment) }} 萬
+                                            <span v-if="loan2Schedule.schedule[6].isGracePeriod" class="text-[10px] text-gray-400 block">(息)</span>
+                                        </span>
+                                        <span v-else class="text-gray-300">-</span>
                                     </td>
                                 </tr>
                                 <tr class="bg-blue-50">
@@ -445,6 +477,12 @@ useCharts(params, monthlyPaymentTotal, simulationData);
                                     <td class="p-3"></td>
                                     <td class="p-3"></td>
                                     <td class="p-3 text-right font-mono font-bold text-blue-700 text-lg">{{ formatMoney(monthlyPaymentTotal) }} 萬</td>
+                                    <td class="p-3 text-right font-mono font-bold text-blue-700 text-lg bg-blue-100">
+                                        {{ formatMoney((loan1Schedule.schedule[3]?.monthlyPayment || 0) + (loan2Schedule.schedule[3]?.monthlyPayment || 0)) }} 萬
+                                    </td>
+                                    <td class="p-3 text-right font-mono font-bold text-blue-700 text-lg">
+                                        {{ formatMoney((loan1Schedule.schedule[6]?.monthlyPayment || 0) + (loan2Schedule.schedule[6]?.monthlyPayment || 0)) }} 萬
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
