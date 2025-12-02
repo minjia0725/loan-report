@@ -138,11 +138,17 @@ export function useLoanCalculator(params) {
         loan1Schedule.value.currentPayment + loan2Schedule.value.currentPayment
     );
 
-    // 計算屬性：總家庭年薪
-    const totalAnnualSalary = computed(() => (params.value.incomeHusband || 0) + (params.value.incomeWife || 0));
+    // 計算屬性：總家庭年薪 (含租金)
+    // 注意：這裡需要將租金收入 (rentIncome) 納入總年收，因為負擔比的分母通常是「家戶總月收」
+    const totalAnnualIncome = computed(() => 
+        (params.value.incomeHusband || 0) + 
+        (params.value.incomeWife || 0) + 
+        (params.value.rentIncome || 0)
+    );
 
     // 計算屬性：負擔比
-    const monthlySalary = computed(() => totalAnnualSalary.value / 12);
+    // 分母：月收入 = (男方年薪 + 女方年薪 + 租金年收) / 12
+    const monthlyIncome = computed(() => totalAnnualIncome.value / 12);
     
     // 負擔比這裡改用「最高月付金」來計算壓力，避免只看寬限期覺得很輕鬆
     const maxMonthlyPayment = computed(() => {
@@ -156,8 +162,9 @@ export function useLoanCalculator(params) {
     });
 
     const burdenRatio = computed(() => {
-        if (!monthlySalary.value || monthlySalary.value <= 0) return 0;
-        return ((maxMonthlyPayment.value / monthlySalary.value) * 100).toFixed(1);
+        if (!monthlyIncome.value || monthlyIncome.value <= 0) return 0;
+        // 分子：月付金，分母：月收入 (含薪資+租金)
+        return ((maxMonthlyPayment.value / monthlyIncome.value) * 100).toFixed(1);
     });
 
     // 負擔比相關 UI 狀態
