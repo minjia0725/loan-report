@@ -214,7 +214,7 @@ const totalAnnualExpense = computed(() => {
                         <h3 class="text-sm font-bold text-blue-600 uppercase mb-3">詳細貸款條件</h3>
                         
                         <div class="mb-4">
-                            <label class="subsection-label">1. 家人抵押貸款 (頭期)</label>
+                            <label class="subsection-label">1. 舊屋抵押貸款 (頭期)</label>
                             
                             <!-- 基本設定 -->
                             <div class="grid grid-cols-2 gap-2 mb-2">
@@ -473,7 +473,7 @@ const totalAnnualExpense = computed(() => {
                             <tbody>
                                 <tr class="border-b">
                                     <td class="p-3">
-                                        <span class="font-bold text-gray-800">1. 家人抵押貸款</span>
+                                        <span class="font-bold text-gray-800">1. 舊屋房屋抵押貸款</span>
                                         <span class="block text-xs text-gray-500">頭期款 + 裝潢</span>
                                         <span v-if="params.gracePeriod1 > 0" class="inline-block bg-orange-100 text-orange-800 text-xs px-2 py-0.5 rounded mt-1">
                                             寬限期 {{ params.gracePeriod1 }} 年
@@ -624,7 +624,7 @@ const totalAnnualExpense = computed(() => {
                             <h3 class="report-section-title">1. 報告摘要 (Executive Summary)</h3>
                             <ul class="list-disc list-inside text-gray-700 space-y-1 pl-2">
                                 <li><strong class="text-gray-900">決策目標：</strong>購入總價 <span class="font-bold text-blue-600">{{ params.housePrice }}萬</span> 房產之可行性評估。</li>
-                                <li><strong class="text-gray-900">資金策略：</strong>採「雙貸款模式」，以家人抵押貸款 ({{ params.mortgageLoan }}萬) 作為頭期款。</li>
+                                <li><strong class="text-gray-900">資金策略：</strong>採「雙貸款模式」，以舊屋房屋抵押貸款 ({{ params.mortgageLoan }}萬) 作為頭期款。</li>
                                 <li><strong class="text-gray-900">核心結論：</strong>
                                     <ul class="list-circle list-inside pl-5 mt-1 text-sm text-gray-600">
                                         <li><strong class="text-green-600">負擔安全：</strong>純薪資負擔比約 {{ burdenRatio }}% (最高點)，符合理財黃金比例。</li>
@@ -656,7 +656,7 @@ const totalAnnualExpense = computed(() => {
                             <h3 class="report-section-title">3. 風險控管與對策</h3>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div class="bg-red-50 p-4 rounded-lg">
-                                    <h4 class="font-bold text-red-700 mb-2">家人抵押貸款風險</h4>
+                                    <h4 class="font-bold text-red-700 mb-2">舊屋房屋抵押貸款風險</h4>
                                     <p class="text-sm text-gray-700">對策：現金流充裕，第 5 年累積現金已超過抵押總額，隨時有能力一次清償。</p>
                                 </div>
                                 <div class="bg-yellow-50 p-4 rounded-lg">
