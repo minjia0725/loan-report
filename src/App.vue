@@ -40,7 +40,10 @@ const defaultParams = {
         car: 3,
         baby: 20
     },
-    babyYear: 3
+    babyYear: 3,
+    parentalLeaveType: 'wife', // 育嬰留停類型：'wife' | 'husband' | 'both'
+    leaveSalaryRatioHusband: 60, // 男方育嬰留停薪資比例 (%)
+    leaveSalaryRatioWife: 60 // 女方育嬰留停薪資比例 (%)
 };
 
 // 使用 LocalStorage 持久化參數
@@ -306,7 +309,7 @@ useCharts(params, monthlyPaymentTotal, simulationData);
                         </div>
                         <div class="input-group">
                             <label class="input-label">舊屋年租金 (萬元)</label>
-                            <input type="number" v-model.number="params.rentIncome" class="input-field" min="0" :class="{'border-red-500': errors.rentIncome}">
+                            <input type="number" v-model.number="params.rentIncome" class="input-field" :class="{'border-red-500': errors.rentIncome}" min="0">
                             <p class="helper-text">目前設定為 0</p>
                         </div>
                     </div>
@@ -384,6 +387,37 @@ useCharts(params, monthlyPaymentTotal, simulationData);
                                     <label class="input-label">月子中心</label>
                                     <input type="number" v-model.number="params.expense.baby" class="input-field" min="0">
                                     <p class="helper-text">僅於該年度計算</p>
+                                </div>
+                                <div class="input-group mb-0 col-span-2">
+                                    <label class="input-label">育嬰留停安排</label>
+                                    <div class="flex flex-col gap-2 mt-1">
+                                        <div class="flex gap-4">
+                                            <label class="flex items-center">
+                                                <input type="radio" v-model="params.parentalLeaveType" value="wife" class="mr-1">
+                                                <span class="text-sm text-gray-700">女方請假</span>
+                                            </label>
+                                            <label class="flex items-center">
+                                                <input type="radio" v-model="params.parentalLeaveType" value="husband" class="mr-1">
+                                                <span class="text-sm text-gray-700">男方請假</span>
+                                            </label>
+                                            <label class="flex items-center">
+                                                <input type="radio" v-model="params.parentalLeaveType" value="both" class="mr-1">
+                                                <span class="text-sm text-gray-700">雙方請假</span>
+                                            </label>
+                                        </div>
+                                        
+                                        <div class="grid grid-cols-2 gap-2 mt-1 p-2 bg-gray-50 rounded border border-gray-200">
+                                            <div v-if="params.parentalLeaveType === 'husband' || params.parentalLeaveType === 'both'">
+                                                <label class="text-xs text-gray-600 block mb-1">男方留停薪資比例 (%)</label>
+                                                <input type="number" v-model.number="params.leaveSalaryRatioHusband" class="w-full p-1 text-sm border rounded" min="0" max="100">
+                                            </div>
+                                            <div v-if="params.parentalLeaveType === 'wife' || params.parentalLeaveType === 'both'">
+                                                <label class="text-xs text-gray-600 block mb-1">女方留停薪資比例 (%)</label>
+                                                <input type="number" v-model.number="params.leaveSalaryRatioWife" class="w-full p-1 text-sm border rounded" min="0" max="100">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <p class="helper-text">模擬該年度留停半年</p>
                                 </div>
                             </div>
                         </div>

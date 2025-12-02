@@ -187,7 +187,8 @@ export function useLoanCalculator(params) {
     // 模擬未來 10 年現金流
     const simulationData = computed(() => {
         const data = [];
-        let currentSalary = totalAnnualSalary.value;
+        let currentHusbandSalary = params.value.incomeHusband || 0;
+        let currentWifeSalary = params.value.incomeWife || 0;
         let accumulated = 0;
         
         const e = params.value.expense;
@@ -196,7 +197,9 @@ export function useLoanCalculator(params) {
         for(let year = 1; year <= 10; year++) {
             // 薪資成長
             if(year > 1 && year <= 5) {
-                currentSalary *= (1 + params.value.salaryGrowth / 100);
+                const growthRate = 1 + params.value.salaryGrowth / 100;
+                currentHusbandSalary *= growthRate;
+                currentWifeSalary *= growthRate;
             }
             
             // 支出通膨
@@ -204,7 +207,8 @@ export function useLoanCalculator(params) {
                 currentLiving *= 1.03;
             }
 
-            let actualSalary = currentSalary;
+            let actualHusbandSalary = currentHusbandSalary;
+            let actualWifeSalary = currentWifeSalary;
             let note = "";
             let noteClass = "";
             let extraExpense = 0;
@@ -213,9 +217,27 @@ export function useLoanCalculator(params) {
             if(year === (params.value.babyYear || 3)) {
                 note = "👼 懷孕育嬰";
                 noteClass = "bg-pink-100 text-pink-800";
-                const loss = currentSalary * 0.05; 
-                actualSalary -= loss;
                 extraExpense = e.baby;
+                
+                // 育嬰留停津貼計算：假設留停半年，津貼為投保薪資8成(上限約45800*0.8)
+                // 使用參數設定的保留薪資比例
+                const husbandRatio = (params.value.leaveSalaryRatioHusband !== undefined) ? params.value.leaveSalaryRatioHusband / 100 : 0.6;
+                const wifeRatio = (params.value.leaveSalaryRatioWife !== undefined) ? params.value.leaveSalaryRatioWife / 100 : 0.6;
+                
+                const leaveType = params.value.parentalLeaveType || 'wife'; // 預設女方
+                
+                if (leaveType === 'wife') {
+                    note += " (女方請假)";
+                    actualWifeSalary *= wifeRatio; 
+                } else if (leaveType === 'husband') {
+                    note += " (男方請假)";
+                    actualHusbandSalary *= husbandRatio;
+                } else if (leaveType === 'both') {
+                    note += " (雙方請假)";
+                    actualWifeSalary *= wifeRatio;
+                    actualHusbandSalary *= husbandRatio;
+                }
+
             } else if (year <= 5) {
                 note = "📈 薪資成長";
                 noteClass = "bg-blue-100 text-blue-800";
@@ -232,7 +254,7 @@ export function useLoanCalculator(params) {
             const annualMortgage = ((s1?.monthlyPayment || 0) + (s2?.monthlyPayment || 0)) * 12;
             const isGracePeriod = (s1?.isGracePeriod || false) || (s2?.isGracePeriod || false);
 
-            const totalIncome = actualSalary + params.value.rentIncome;
+            const totalIncome = actualHusbandSalary + actualWifeSalary + params.value.rentIncome;
             const totalExpense = annualMortgage + currentLiving + extraExpense;
             const balance = totalIncome - totalExpense;
             accumulated += balance;
